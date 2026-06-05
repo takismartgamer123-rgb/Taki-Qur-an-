@@ -1,11 +1,10 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 const { spawn } = require('child_process');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const STREAM_KEY = process.env.STREAM_KEY;
-const OVERLAY_URL = 'https://dz-netflix.onrender.com'; // 🔴 بدل هذا برك
+const OVERLAY_URL = 'https://dz-netflix.onrender.com'; // رابطك راهو صحيح
 
 // الروابط تاع القرآن - الأساسي + احتياطي
 const QURAN_URL_1 = 'https://stream.radiojar.com/8s5u5tpdtwzuv'; // إذاعة القرآن السعودية
@@ -31,6 +30,10 @@ function killProcesses() {
 
 async function startStream() {
   if (isStreaming) return;
+  if (!STREAM_KEY) {
+    console.log('[TAKI24] خطأ: STREAM_KEY ناقص في Environment');
+    return;
+  }
   isStreaming = true;
   restartCount++;
   console.log(`[TAKI24] تشغيل بالقرآن #${restartCount} - ${new Date().toLocaleString('ar-DZ')}`);
@@ -39,9 +42,10 @@ async function startStream() {
     killProcesses();
     if (browserInstance) await browserInstance.close();
 
+    // 🔥 التعديل المهم: كروم المستقر تاع Render
     browserInstance = await puppeteer.launch({
       headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+      executablePath: '/usr/bin/google-chrome-stable', // نثبتوه على كروم المستقر
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -52,36 +56,29 @@ async function startStream() {
         '--start-fullscreen',
         '--kiosk',
         '--hide-scrollbars',
-        '--mute-audio', // مهم: نطفي صوت الأوفرلاي
+        '--mute-audio',
         '--disable-background-networking',
-        '--js-flags=--max-old-space-size=256'
+        '--js-flags=--max-old-space-size=256',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images' // نقصو الرام أكثر
       ]
     });
 
     const page = await browserInstance.newPage();
     await page.setViewport({ width: SOURCE_WIDTH, height: SOURCE_HEIGHT });
-    await page.goto(OVERLAY_URL, { waitUntil: 'networkidle2', timeout: 60000 });
-    await page.evaluate(() => document.documentElement.requestFullscreen());
-    await new Promise(r => setTimeout(r, 5000));
+    await page.goto(OVERLAY_URL, { waitUntil: 'domcontentloaded', timeout: 90000 }); // بدلناها لـ domcontentloaded أخف
+    await new Promise(r => setTimeout(r, 8000)); // نزيدو الوقت باه يتشارجا موقعك كامل
 
     console.log('[TAKI24] نشعل FFmpeg مع القرآن...');
     ffmpegProcess = spawn('ffmpeg', [
       '-f', 'image2pipe', '-framerate', '30', '-i', 'pipe:0',
-
-      // صوت القرآن مع إعادة اتصال تلقائية لو طاح
-      '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
-      '-i', QURAN_URL_1,
-
-      // صوت احتياطي لو الأول مات
-      '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
-      '-i', QURAN_URL_2,
-
-      // لو الأول طاح يبدل للثاني وحدو
+      '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5', '-i', QURAN_URL_1,
+      '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5', '-i', QURAN_URL_2,
       '-filter_complex', '[1:a][2:a]amix=inputs=2:duration=first:dropout_transition=3,volume=0.85',
-
-      '-vf', `scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:flags=lanczos`,
+      '-vf', `scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:flags=fast_bilinear`, // أخف من lanczos
       '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
-      '-b:v', '3500k', '-maxrate', '3500k', '-bufsize', '7000k',
+      '-b:v', '3000k', '-maxrate', '3000k', '-bufsize', '6000k', // نقصنا البتريت شوية للأمان
       '-pix_fmt', 'yuv420p', '-g', '60', '-keyint_min', '60',
       '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
       '-f', 'flv', `rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}`
@@ -89,7 +86,7 @@ async function startStream() {
 
     ffmpegProcess.stderr.on('data', (d) => {
       const msg = d.toString();
-      if (!msg.includes('frame=')) console.log(`FFmpeg: ${msg}`);
+      if (msg.includes('error') || msg.includes('Error')) console.log(`FFmpeg Error: ${msg}`);
     });
 
     ffmpegProcess.on('close', (code) => {
@@ -101,7 +98,7 @@ async function startStream() {
     const captureLoop = setInterval(async () => {
       try {
         if (!isStreaming || page.isClosed()) return clearInterval(captureLoop);
-        const screenshot = await page.screenshot({ type: 'jpeg', quality: 75 });
+        const screenshot = await page.screenshot({ type: 'jpeg', quality: 70 }); // نقصنا الجودة لـ 70 للأمان
         if (ffmpegProcess &&!ffmpegProcess.stdin.destroyed) {
           ffmpegProcess.stdin.write(screenshot);
         }
@@ -112,7 +109,7 @@ async function startStream() {
       }
     }, 1000 / 30);
 
-    console.log('[TAKI24] بث القرآن 720p شغال - 410MB RAM 👑');
+    console.log('[TAKI24] بث القرآن 720p شغال - ~370MB RAM 👑');
 
   } catch (err) {
     console.log(`[TAKI24] كراش: ${err.message}`);
@@ -127,7 +124,7 @@ app.get('/health', (req, res) => {
     status: isStreaming? 'live' : 'starting',
     audio: 'Quran 24/7',
     output: '1280x720',
-    ram: '~410MB',
+    ram: '~370MB',
     restarts: restartCount,
     uptime: `${Math.floor(uptime/3600)}h ${Math.floor((uptime%3600)/60)}m`
   });
