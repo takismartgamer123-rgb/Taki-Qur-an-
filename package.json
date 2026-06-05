@@ -1,16 +1,15 @@
 {
   "name": "taki24-live-quran",
   "version": "4.0.0",
-  "description": "ɪʈʂ ʈɑkɪ!! 🇩🇿²⁴ - Quran 24/7",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "puppeteer": "^21.6.1"
+    "puppeteer": "19.11.1"
   }
 }
