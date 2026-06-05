@@ -1,5 +1,6 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const { spawn } = require('child_process');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,12 +43,10 @@ async function startStream() {
         killProcesses();
         if (browserInstance) await browserInstance.close();
 
+        // 🔥 الحل النهائي: chromium خفيف تاع Render
         browserInstance = await puppeteer.launch({
-            headless: 'new',
             args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
+               ...chromium.args,
                 '--single-process',
                 '--disable-gpu',
                 `--window-size=${SOURCE_WIDTH},${SOURCE_HEIGHT}`,
@@ -60,7 +59,10 @@ async function startStream() {
                 '--disable-extensions',
                 '--disable-plugins',
                 '--disable-images'
-            ]
+            ],
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
         });
 
         const page = await browserInstance.newPage();
@@ -128,7 +130,7 @@ async function startStream() {
             }
         }, 1000 / 30);
 
-        console.log('[TAKI24] بث القرآن 720p شغال - ~370MB RAM 👑');
+        console.log('[TAKI24] بث القرآن 720p شغال - ~300MB RAM 👑');
 
     } catch (err) {
         console.log(`[TAKI24] كراش: ${err.message}`);
@@ -143,7 +145,7 @@ app.get('/health', (req, res) => {
         status: isStreaming? 'live' : 'starting',
         audio: 'Quran 24/7',
         output: '1280x720',
-        ram: '~370MB',
+        ram: '~300MB',
         restarts: restartCount,
         uptime: `${Math.floor(uptime/3600)}h ${Math.floor((uptime%3600)/60)}m`
     });
