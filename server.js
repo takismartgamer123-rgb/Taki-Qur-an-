@@ -6,7 +6,6 @@ const PORT = process.env.PORT || 3000;
 const STREAM_KEY = process.env.STREAM_KEY;
 const OVERLAY_URL = 'https://dz-netflix.onrender.com';
 
-// الروابط تاع القرآن - الأساسي + احتياطي
 const QURAN_URL_1 = 'https://stream.radiojar.com/8s5u5tpdtwzuv';
 const QURAN_URL_2 = 'https://backup.qurango.net/radio/maher_almuaiqly';
 
@@ -43,10 +42,8 @@ async function startStream() {
         killProcesses();
         if (browserInstance) await browserInstance.close();
 
-        // 🔥 التعديل المهم: كروميوم تاع Render
         browserInstance = await puppeteer.launch({
             headless: 'new',
-            executablePath: '/usr/bin/chromium', // هذا هو الصح
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
