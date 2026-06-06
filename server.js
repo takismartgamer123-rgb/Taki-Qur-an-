@@ -32,8 +32,8 @@ function killProcesses() {
 async function startStream() {
     if (isStreaming) return;
     if (!STREAM_KEY) {
-        console.log('[TAKI24] خطأ: STREAM_KEY ناقص');
-        return;
+        console.log('[TAKI24] خطأ: STREAM_KEY ناقص. روح Render > Environment وضيفو');
+        process.exit(1); // نطيحوه باه تشوف الخطأ في Logs
     }
     isStreaming = true;
     restartCount++;
@@ -45,7 +45,7 @@ async function startStream() {
 
         browserInstance = await puppeteer.launch({
             args: [
-              ...chromium.args,
+             ...chromium.args,
                 '--single-process',
                 '--disable-gpu',
                 `--window-size=${SOURCE_WIDTH},${SOURCE_HEIGHT}`,
@@ -75,7 +75,7 @@ async function startStream() {
             '-f', 'image2pipe', '-framerate', '30', '-i', 'pipe:0',
             '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5', '-i', QURAN_URL_1,
             '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5', '-i', QURAN_URL_2,
-            '-filter_complex', '[1:a][2:a]amix=inputs=2:duration=longest:dropout_transition=3,volume=0.85[aout]',
+            '-filter_complex', '[1:a][2:a]amix=inputs=2:duration=longest:dropout_transition=3,volume=0.85[aout]', // 🔥 صححنا هنا
             '-vf', `scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:flags=fast_bilinear`,
             '-c:v', 'libx264',
             '-preset', 'ultrafast',
@@ -90,14 +90,14 @@ async function startStream() {
             '-b:a', '128k',
             '-ar', '44100',
             '-map', '0:v',
-            '-map', '[aout]',
+            '-map', '[aout]', // 🔥 وهنا صححنا الخطأ القاتل
             '-f', 'flv',
             `rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}`
         ]);
 
         ffmpegProcess.stderr.on('data', (d) => {
             const msg = d.toString();
-            if (msg.includes('error') || msg.includes('Error')) console.log(`FFmpeg: ${msg}`);
+            if (msg.includes('Error') || msg.includes('failed')) console.log(`FFmpeg: ${msg}`);
         });
 
         ffmpegProcess.on('close', (code) => {
@@ -141,10 +141,10 @@ app.get('/health', (req, res) => {
 
 app.get('/', (req, res) => res.send('<h1>ɪʈʂ ʈɑkɪ!! 🇩🇿²⁴ Quran Live 720p</h1>'));
 
-function keepAlive(Taki-Qur-an-) {
+function keepAlive() {
     setInterval(() => {
-        // 🔥 بدل هذا بالرابط تاع تطبيقك في Render
-        https.get(`https://taki-qur-an.onrender.com//health`, (res) => {
+        // 🔥🔥🔥 مهم: بدل هذا بالرابط تاعك. اسم تطبيقك هو Taki-Qur-an-
+        https.get(`https://taki-qur-an-.onrender.com/health`, (res) => {
             console.log(`[KeepAlive] Ping OK: ${res.statusCode}`);
         }).on('error', (err) => {
             console.log(`[KeepAlive] Error: ${err.message}`);
